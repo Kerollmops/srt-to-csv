@@ -1,4 +1,5 @@
 use std::io::{self, Read};
+use std::time::Duration;
 use std::fmt;
 use nom::{
   IResult,
@@ -8,7 +9,15 @@ use nom::{
   bytes::complete::tag,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
+pub struct SubTitle {
+    pub index: u32,
+    pub start: Time,
+    pub end: Time,
+    pub text: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,
@@ -16,7 +25,17 @@ pub struct Time {
     pub milliseconds: u16,
 }
 
-impl fmt::Debug for Time {
+impl Time {
+    pub fn to_duration(&self) -> Duration {
+        let mut millis = self.milliseconds as u64;
+        millis += self.seconds as u64 * 1000;
+        millis += self.minutes as u64 * 1000 * 60;
+        millis += self.hours as u64 * 1000 * 60 * 3;
+        Duration::from_millis(millis)
+    }
+}
+
+impl fmt::Display for Time {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}:{},{}", self.hours, self.minutes, self.seconds, self.milliseconds)
     }
@@ -45,14 +64,6 @@ fn time_and_arrow(i: &str) -> IResult<&str, (Time, Time)> {
     let (i, end) = one_time(i)?;
 
     Ok((i, (start, end)))
-}
-
-#[derive(Debug, Clone)]
-pub struct SubTitle {
-    pub index: u32,
-    pub start: Time,
-    pub end: Time,
-    pub text: String,
 }
 
 fn until_empty_newline(i: &str) -> IResult<&str, &str> {
