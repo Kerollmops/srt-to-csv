@@ -1,0 +1,10 @@
+[package]
+name = "srt-to-csv"
+version = "0.1.0"
+authors = ["Clément Renault <renault.cle@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+csv = "1.1.1"
+main_error = "0.1.0"
+nom = "5.0.1"
