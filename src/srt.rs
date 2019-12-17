@@ -29,8 +29,8 @@ impl Time {
     pub fn to_duration(&self) -> Duration {
         let mut millis = self.milliseconds as u64;
         millis += self.seconds as u64 * 1000;
-        millis += self.minutes as u64 * 1000 * 60;
-        millis += self.hours as u64 * 1000 * 60 * 3;
+        millis += self.minutes as u64 * 60_000;
+        millis += self.hours as u64 * 3_600_000;
         Duration::from_millis(millis)
     }
 }
