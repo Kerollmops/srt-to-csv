@@ -1,12 +1,12 @@
-use std::io::{self, Read};
 use std::time::Duration;
 use std::fmt;
 use nom::{
-  IResult,
-  sequence::delimited,
-  combinator::{map_res, opt},
-  character::complete::{digit1, space0, crlf},
-  bytes::complete::tag,
+    IResult,
+    bytes::complete::tag,
+    character::complete::{digit1, space0, line_ending},
+    combinator::{map_res, opt},
+    multi::fold_many0,
+    sequence::delimited,
 };
 
 #[derive(Debug, Clone)]
@@ -67,16 +67,18 @@ fn time_and_arrow(i: &str) -> IResult<&str, (Time, Time)> {
 }
 
 fn until_empty_newline(i: &str) -> IResult<&str, &str> {
-    let lines = i.lines();
-    let mut count = 0;
-
-    for line in lines {
-        count += line.len() + 2; // for the crlf (it's wrong)
-        if line.is_empty() { break }
+    let bytes = i.as_bytes();
+    match bytes.windows(4).position(|x| &x[0..2] == b"\n\n" || x == b"\r\n\r\n") {
+        Some(pos) if &bytes[pos..pos + 2] == b"\n\n" => {
+            let (taken, rest) = i.split_at(pos + 2);
+            Ok((rest, taken))
+        },
+        Some(pos) => {
+            let (taken, rest) = i.split_at(pos + 4);
+            Ok((rest, taken))
+        }
+        None => Ok(("", i)),
     }
-
-    let (text, rest) = i.split_at(count);
-    Ok((rest, text.trim()))
 }
 
 // 1
@@ -87,32 +89,30 @@ fn one_subtitle(i: &str) -> IResult<&str, SubTitle> {
     let integer = map_res(digit1, |s: &str| s.parse::<u32>());
 
     let (i, index) = integer(i)?;
-    let (i, _) = crlf(i)?;
+    let (i, _) = line_ending(i)?;
     let (i, (start, end)) = time_and_arrow(i)?;
-    let (i, _) = crlf(i)?;
+    let (i, _) = line_ending(i)?;
     let (i, text) = until_empty_newline(i)?;
-    let text = text.to_owned();
+    let text = text.trim().to_owned();
 
     Ok((i, SubTitle { index, start, end, text }))
 }
 
-fn parser(i: &str) -> IResult<&str, Option<&str>> {
+fn opt_byte(i: &str) -> IResult<&str, Option<&str>> {
     opt(tag("\u{feff}"))(i)
 }
 
-pub fn from_reader<R: Read>(mut reader: R) -> io::Result<Vec<SubTitle>> {
-    let mut input = String::new();
-    reader.read_to_string(&mut input)?;
+pub fn from_str(input: &str) -> Result<Vec<SubTitle>, ()> {
+    let (input, _) = opt_byte(input).unwrap();
 
-    let mut subtitles = Vec::new();
-    let (mut input, _) = parser(&input[..]).unwrap();
-
-    loop {
-        let (i, sub) = one_subtitle(&input).unwrap(); // bad !
-        subtitles.push(sub);
-        if i.is_empty() { break }
-        input = i;
-    }
+    let (input, subtitles) = fold_many0(
+        one_subtitle,
+        Vec::new(),
+        |mut acc: Vec<_>, item| {
+            acc.push(item);
+            acc
+        }
+    )(input).unwrap();
 
     Ok(subtitles)
 }
@@ -134,7 +134,7 @@ I know, but I felt like taking a shift.
 
 "#;
 
-        let subs = from_reader(content.as_bytes()).unwrap();
+        let subs = from_str(content).unwrap();
         let sub = &subs[0];
 
         assert_eq!(sub.index, 1);

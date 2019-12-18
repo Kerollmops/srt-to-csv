@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::io;
 
 use main_error::MainError;
@@ -5,7 +6,10 @@ use main_error::MainError;
 mod srt;
 
 fn main() -> Result<(), MainError> {
-    let subs = srt::from_reader(io::stdin())?;
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
+
+    let subs = srt::from_str(&input).unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
